@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<target defaultPerceivedHeight="500" defaultPerceivedWidth="500" defaultDistance="3000">
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="200.000000" radiusY="200.000000" fill="white">
+		<tag name="points" value="1" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="199.000000" radiusY="199.000000" fill="black">
+		<tag name="points" value="1" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="180.000000" radiusY="180.000000" fill="gray">
+		<tag name="points" value="2" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="179.000000" radiusY="179.000000" fill="black">
+		<tag name="points" value="2" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="160.000000" radiusY="160.000000" fill="gray">
+		<tag name="points" value="3" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="159.000000" radiusY="159.000000" fill="black">
+		<tag name="points" value="3" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="140.000000" radiusY="140.000000" fill="gray">
+		<tag name="points" value="4" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="139.000000" radiusY="139.000000" fill="black">
+		<tag name="points" value="4" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="120.000000" radiusY="120.000000" fill="gray">
+		<tag name="points" value="5" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="119.000000" radiusY="119.000000" fill="black">
+		<tag name="points" value="5" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="100.000000" radiusY="100.000000" fill="gray">
+		<tag name="points" value="6" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="99.000000" radiusY="99.000000" fill="black">
+		<tag name="points" value="6" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="80.000000" radiusY="80.000000" fill="gray">
+		<tag name="points" value="7" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="79.000000" radiusY="79.000000" fill="black">
+		<tag name="points" value="7" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="60.000000" radiusY="60.000000" fill="gray">
+		<tag name="points" value="8" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="59.000000" radiusY="59.000000" fill="black">
+		<tag name="points" value="8" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="40.000000" radiusY="40.000000" fill="gray">
+		<tag name="points" value="9" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="39.000000" radiusY="39.000000" fill="black">
+		<tag name="points" value="9" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="20.000000" radiusY="20.000000" fill="gray">
+		<tag name="points" value="10" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="19.000000" radiusY="19.000000" fill="black">
+		<tag name="points" value="10" />
+		<tag name="opacity" value="1" />
+	</ellipse>
+</target>
