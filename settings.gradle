@@ -1,0 +1,3 @@
+rootProject.name = "RandomTargetParDrill"
+//include ":ShootOFF"
+//project(":ShootOFF").projectDir = new File(settingsDir, "../ShootOff")

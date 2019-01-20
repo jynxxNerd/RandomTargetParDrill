@@ -1,0 +1,22 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+eclipse {
+    jdt {
+        sourceCompatibility = 1.8
+        targetCompatibility = 1.8
+    }
+}
+
+repositories {
+    jcenter()
+
+    flatDir {
+        dirs "../ShootOFF/build/libs"
+    }
+}
+
+dependencies{
+    compile name: "ShootOFF" //project(":ShootOFF")
+    compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.25'
+}
