@@ -15,17 +15,21 @@ import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Ellipse;
 import javafx.scene.text.Font;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -37,18 +41,18 @@ import java.util.concurrent.TimeUnit;
 public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implements RoundLimitListener, ParListener, TrainingExercise, DelayedStartListener {
 	private static final Logger logger = LoggerFactory.getLogger(RandomTargetParDrill.class);
 
-	private static final String TARGET_FILE = "targets/ISSF_white.target";
+	private static final String TARGET_FILE = "@targets/ISSF.target";
 	private static final String PAUSE = "Pause";
 	private static final String RESUME = "Resume";
-	private final static String LENGTH_COL_NAME = "Length";
-	private final static int LENGTH_COL_WIDTH = 60;
-	private final static String POINTS_COL_NAME = "Score";
-	private final static int POINTS_COL_WIDTH = 60;
+
+	private static final String LENGTH_COL_NAME = "Length";
+	private static final int LENGTH_COL_WIDTH = 60;
+	private static final String POINTS_COL_NAME = "Score";
+	private static final int POINTS_COL_WIDTH = 60;
+
 	private static final int MAX_ROUNDS = 10;
-
-	private final static int START_DELAY = 10; // s
-	private final static int RESUME_DELAY = 5; // s
-
+	private static final int START_DELAY = 10; // s
+	private static final int RESUME_DELAY = 5; // s
 	private static final int CORE_POOL_SIZE = 2;
 
 	private Target target;
@@ -108,6 +112,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		pauseResumeButton.setText(PAUSE);
 		resetValues();
 		repeatExercise = true;
+		trackedShots.clear();
 
 		executorService = Executors.newScheduledThreadPool(CORE_POOL_SIZE,
 				new NamedThreadFactory("RandomTargetParDrill"));
@@ -143,7 +148,8 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	protected class TargetHider implements Runnable {
 		@Override
 		public void run() {
-			hideTargets();
+			hideTarget();
+			hideShots();
 		}
 	}
 
@@ -163,7 +169,8 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 
 		pauseResumeButton = addShootOFFButton(PAUSE, (event) -> {
 			if(round >= roundLimit){
-				TrainingExerciseBase.playSound("sounds/buzzer.wav");
+				InputStream buzzer = getSoundStream("/sounds/buzzer.wav");
+				TrainingExerciseBase.playSound(buzzer);
 				return;
 			}
 
@@ -232,6 +239,14 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		executorService.schedule(new RandomTargetParDrill.SetupWait(), START_DELAY, TimeUnit.SECONDS);
 	}
 
+	private void createTarget(){
+		Optional<Target> target = super.addTarget(new File(TARGET_FILE), 0,0);
+		if(target.isPresent()) {
+			target.get().setVisible(false);
+			this.target = target.get();
+		}
+	}
+
 	private int setupRound() {
 		if (hadShot) {
 			coloredRows = !coloredRows;
@@ -251,7 +266,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		playSound("sounds/beep.wav");
 
 		randomizeTargets();
-		showTargets();
+		showTarget();
 
 		updateRoundLabel();
 		hideLastTime();
@@ -270,10 +285,15 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			parMissed();
 		}
 
-		TrainingExerciseBase.playSound("sounds/buzzer.wav");
+		InputStream buzzer = getSoundStream("/sounds/buzzer.wav");
+		TrainingExerciseBase.playSound(buzzer);
 		pauseShotDetection(true);
 		countScore = false;
 		endRound();
+	}
+
+	private InputStream getSoundStream(String soundResource){
+		return new BufferedInputStream(RandomTargetParDrill.class.getResourceAsStream(soundResource));
 	}
 
 	@Override
@@ -293,7 +313,8 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			return;
 		}
 
-		recordShot(shot,hit);
+		drawShot((ArenaShot)shot);
+		recordShot((ArenaShot)shot, hit);
 
 		if (!hit.isPresent() || !countScore) {
 			if(!countScore){
@@ -320,8 +341,8 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		setLastTime(roundScore);
 	}
 
-	private void recordShot(Shot shot, Optional<Hit> hit){
-		ArenaShot arenaShot = (ArenaShot)shot;
+	private void recordShot(ArenaShot shot, Optional<Hit> hit){
+		ArenaShot arenaShot = shot;
 		Point2D arenaShotPos = new Point2D(arenaShot.getArenaX(), arenaShot.getArenaY());
 		Point2D hitPos = null;
 		int points = 0;
@@ -337,7 +358,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			}
 		}
 
-		TrackedShot trackedShot = new TrackedShot(target.getPosition(), arenaShotPos, hitPos, this.shotTime, points );
+		TrackedShot trackedShot = new TrackedShot(shot, target.getPosition(), arenaShotPos, hitPos, this.shotTime, points );
 		trackedShots.add(trackedShot);
 	}
 
@@ -359,15 +380,12 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			repeatExercise = false;
 			pauseShotDetection(false);
 			shootToReset = true;
+			displayResults();
 		}
 	}
 
-	private void createTarget(){
-		Optional<Target> target = super.addTarget(new File(TARGET_FILE), 0,0);
-		if(target.isPresent()) {
-			target.get().setVisible(false);
-			this.target = target.get();
-		}
+	private void displayResults(){
+
 	}
 
 	private void randomizeTargets(){
@@ -378,14 +396,34 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		final int maxY = (int) (super.getArenaHeight() - target.getDimension().getHeight() - 50);
 		final int y = new Random().nextInt(maxY);
 
+		logger.info(String.format("Placing target at x: %d, y: %d", x, y));
 		target.setPosition(x, y);
 	}
 
-	private void hideTargets(){
+
+	private void drawShot(ArenaShot shot){
+		Platform.runLater(() -> {
+			Group canvasGroup = this.getArenaPane().getCanvasManager().getCanvasGroup();
+			int shotIdx = canvasGroup.getChildren().indexOf(shot.getMarker());
+			Ellipse marker = (Ellipse)this.getArenaPane().getCanvasManager().getCanvasGroup().getChildren().get(shotIdx);
+			marker.setVisible(true);
+		});
+	}
+
+	private void hideShots(){
+		for (TrackedShot trackedShot : trackedShots) {
+			Group canvasGroup = getArenaPane().getCanvasManager().getCanvasGroup();
+			int shotIdx = canvasGroup.getChildren().indexOf(trackedShot.getArenaShot().getMarker());
+			Ellipse marker = (Ellipse)canvasGroup.getChildren().get(shotIdx);
+			marker.setVisible(false);
+		}
+	}
+
+	private void hideTarget(){
 		target.setVisible(false);
 	}
 
-	private void showTargets(){
+	private void showTarget(){
 		target.setVisible(true);
 	}
 
@@ -478,18 +516,24 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	}
 
 	private static class TrackedShot {
+		private ArenaShot arenaShot;
 		float shotTime;
 		int points;
 		Point2D arenaShotPos;
 		Point2D targetPos;
 		Point2D hitPos;
 
-		public TrackedShot(Point2D targetPos, Point2D arenaShotPos, Point2D hitPos, float shotTime, int points) {
+		public TrackedShot(ArenaShot arenaShot, Point2D targetPos, Point2D arenaShotPos, Point2D hitPos, float shotTime, int points) {
+			this.arenaShot = arenaShot;
 			this.arenaShotPos = arenaShotPos;
 			this.targetPos = targetPos;
 			this.hitPos = hitPos;
 			this.shotTime = shotTime;
 			this.points = points;
+		}
+
+		public ArenaShot getArenaShot() {
+			return arenaShot;
 		}
 
 		public float getShotTime() {
