@@ -76,8 +76,8 @@
 		<tag name="points" value="10" />
 		<tag name="opacity" value="1" />
 	</ellipse>
-	<ellipse centerX="200.000000" centerY="200.000000" radiusX="19.000000" radiusY="19.000000" fill="black">
+	<ellipse centerX="200.000000" centerY="200.000000" radiusX="19.000000" radiusY="19.000000" fill="red">
 		<tag name="points" value="10" />
-		<tag name="opacity" value="1" />
+		<tag name="opacity" value=".2" />
 	</ellipse>
 </target>

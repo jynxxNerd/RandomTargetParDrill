@@ -5,6 +5,7 @@ import com.shootoff.camera.shot.ArenaShot;
 import com.shootoff.camera.shot.DisplayShot;
 import com.shootoff.camera.shot.ShotColor;
 import com.shootoff.gui.DelayedStartListener;
+import com.shootoff.gui.LocatedImage;
 import com.shootoff.gui.ParListener;
 import com.shootoff.gui.RoundLimitListener;
 import com.shootoff.targets.Hit;
@@ -42,6 +43,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	private static final Logger logger = LoggerFactory.getLogger(RandomTargetParDrill.class);
 
 	private static final String TARGET_FILE = "@targets/ISSF.target";
+	private static final String BUZZER_WAV = "/sounds/buzzer.wav";
 	private static final String PAUSE = "Pause";
 	private static final String RESUME = "Resume";
 
@@ -73,6 +75,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	private boolean countScore = false;
 	private boolean shootToReset = false;
 	private boolean hadShot = false;
+	private boolean isDrillComplete = false;
 	private long beepTime = 0;
 	private long roundStartTime = 0;
 	private float shotTime;
@@ -105,14 +108,14 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 
 	@Override
 	public void reset(List<Target> targets) {
-		roundStartTime = 0;
-		repeatExercise = false;
 		pauseShotDetection(true);
 		executorService.shutdownNow();
 		pauseResumeButton.setText(PAUSE);
+
+		hideTarget();
+		hideShots();
+
 		resetValues();
-		repeatExercise = true;
-		trackedShots.clear();
 
 		executorService = Executors.newScheduledThreadPool(CORE_POOL_SIZE,
 				new NamedThreadFactory("RandomTargetParDrill"));
@@ -131,7 +134,9 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	protected class SetupWait implements Runnable {
 		@Override
 		public void run() {
-			if (!repeatExercise) return;
+			if (!repeatExercise){
+				return;
+			}
 
 			pauseShotDetection(true);
 			playSound(new File("sounds/voice/shootoff-makeready.wav"));
@@ -140,8 +145,6 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			if (repeatExercise) {
 				executorService.schedule(new RandomTargetParDrill.Round(), randomDelay, TimeUnit.SECONDS);
 			}
-
-			return;
 		}
 	}
 
@@ -159,18 +162,25 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			if (repeatExercise) {
 				doRound();
 				executorService.schedule(new RandomTargetParDrill.Round(), setupRound(), TimeUnit.SECONDS);
-			}
 
-			return;
+				if(isDrillComplete){
+					executorService.schedule(RandomTargetParDrill.this::displayResults, 1, TimeUnit.SECONDS);
+				}
+			}
 		}
 	}
 
-	protected void initUI() {
+	private void setBackground(){
+		final InputStream is = RandomTargetParDrill.class.getResourceAsStream("/backgrounds/blackBG.png");
+		final LocatedImage img = new LocatedImage(is, "/backgrounds/blackBG.png");
+		setArenaBackground(img);
+	}
 
+	protected void initUI() {
+		setBackground();
 		pauseResumeButton = addShootOFFButton(PAUSE, (event) -> {
 			if(round >= roundLimit){
-				InputStream buzzer = getSoundStream("/sounds/buzzer.wav");
-				TrainingExerciseBase.playSound(buzzer);
+				soundBuzzer();
 				return;
 			}
 
@@ -256,7 +266,13 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 
 		final int randomDelay = new Random().nextInt((delayMax - delayMin) + 1) + delayMin;
 		final int randomDelay2 = new Random().nextInt((Integer.max((delayMax/2), delayMin) - delayMin) + 1) + delayMin;
-		executorService.schedule(new RandomTargetParDrill.TargetHider(), Integer.min(randomDelay, randomDelay2), TimeUnit.SECONDS);
+
+		if(isDrillComplete) {
+			executorService.schedule(new RandomTargetParDrill.TargetHider(), 500, TimeUnit.MILLISECONDS);
+			return 0;
+		} else {
+			executorService.schedule(new RandomTargetParDrill.TargetHider(), Integer.min(randomDelay, randomDelay2), TimeUnit.SECONDS);
+		}
 		return randomDelay;
 	}
 
@@ -285,15 +301,16 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			parMissed();
 		}
 
-		InputStream buzzer = getSoundStream("/sounds/buzzer.wav");
-		TrainingExerciseBase.playSound(buzzer);
+		soundBuzzer();
+
 		pauseShotDetection(true);
 		countScore = false;
-		endRound();
+		checkDrillComplete();
 	}
 
-	private InputStream getSoundStream(String soundResource){
-		return new BufferedInputStream(RandomTargetParDrill.class.getResourceAsStream(soundResource));
+	private void soundBuzzer(){
+		InputStream buzzer = new BufferedInputStream(RandomTargetParDrill.class.getResourceAsStream(BUZZER_WAV));
+		TrainingExerciseBase.playSound(buzzer);
 	}
 
 	@Override
@@ -314,7 +331,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		}
 
 		drawShot((ArenaShot)shot);
-		recordShot((ArenaShot)shot, hit);
+		recordShot((ArenaShot)shot, hit, false);
 
 		if (!hit.isPresent() || !countScore) {
 			if(!countScore){
@@ -341,33 +358,85 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		setLastTime(roundScore);
 	}
 
-	private void recordShot(ArenaShot shot, Optional<Hit> hit){
-		ArenaShot arenaShot = shot;
-		Point2D arenaShotPos = new Point2D(arenaShot.getArenaX(), arenaShot.getArenaY());
-		Point2D hitPos = null;
-		int points = 0;
-
-		if(hit.isPresent()) {
-			hitPos = new Point2D(hit.get().getShot().getX(), hit.get().getShot().getY());
-			//hitPos = new Point2D(hit.get().getImpactX(), hit.get().getImpactY());
-
-			final TargetRegion r = hit.get().getHitRegion();
-			if (r.tagExists("points")) {
-				String pointsStr = r.getTag("points");
-				points = Integer.parseInt(pointsStr);
-			}
+	private void recordShot(ArenaShot shot, Optional<Hit> optionalHit, boolean missedPar){
+		if(shot.getColor().equals(ShotColor.GREEN)){
+			logger.info("Ignored GREEN shot!!!");
+			return;
 		}
 
-		TrackedShot trackedShot = new TrackedShot(shot, target.getPosition(), arenaShotPos, hitPos, this.shotTime, points );
+		Point2D arenaShotPos = new Point2D(shot.getArenaX(), shot.getArenaY());
+		Hit hit = null;
+
+		if(optionalHit.isPresent()) {
+			hit = optionalHit.get();
+		}
+
+		TrackedShot trackedShot = new TrackedShot(shot, target.getPosition(), arenaShotPos, hit, this.shotTime, missedPar );
 		trackedShots.add(trackedShot);
+	}
+
+	private void displayResults(){
+		Platform.runLater(() -> {
+			double targetPosX = (super.getArenaWidth() / 2) - (target.getDimension().getWidth() / 2) - 50;
+			double targetPosY = (super.getArenaHeight() / 2) - (target.getDimension().getHeight() / 2) - 50;
+			target.setPosition(targetPosX, targetPosY);
+			target.setVisible(true);
+
+			int numShots = 0;
+			float timeTotal = 0;
+			int numMisses = 0;
+			int numParMisses = 0;
+			int pointsTotal = 0;
+
+			Group canvasGroup = getArenaPane().getCanvasManager().getCanvasGroup();
+			for (TrackedShot trackedShot : trackedShots) {
+				logger.info(String.format("Shot %d: %.2f - par time = %.2f", numShots, trackedShot.getShotTime(), parTime));
+				numShots++;
+				timeTotal += trackedShot.getShotTime();
+				if(trackedShot.getHit() == null && !trackedShot.isMissedPar()){
+					numMisses++;
+				}
+				if(trackedShot.isMissedPar()){
+					numParMisses++;
+				}
+				pointsTotal += trackedShot.getPoints();
+
+				Point2D targetPos = target.getPosition();
+				Point2D shotTargetPos = trackedShot.getTargetPos();
+
+				double adjustedX = targetPos.getX() - shotTargetPos.getX() + trackedShot.getArenaShot().getArenaX();
+				double adjustedY = targetPos.getY() - shotTargetPos.getY() + trackedShot.getArenaShot().getArenaY();
+
+				int shotIdx = canvasGroup.getChildren().indexOf(trackedShot.getArenaShot().getMarker());
+				if (shotIdx != -1) {
+					Ellipse marker = (Ellipse) canvasGroup.getChildren().get(shotIdx);
+					marker.setCenterX(adjustedX);
+					marker.setCenterY(adjustedY);
+					marker.setVisible(true);
+				}
+			}
+
+			float avgTime = timeTotal / numShots;
+			float avgPoints = (float)pointsTotal / numShots;
+
+			logger.info(String.format("Total Points: %d, Total Time: %.2f; Average Points: %.3f; Average Time: %.3f; Missed Shots: %d; Missed Par: %d", pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses));
+			String message = String.format("TotalShots: %d\nTotal Points: %d\nTotal Time: %.2f\nAverage Points: %.3f\nAverage Time: %.3f\nMissed Shots: %d\nMissed Par: %d", numShots, pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses);
+			showTextOnFeed(message);
+
+		});
+
+		executorService.schedule(this::hideLastTime, 1, TimeUnit.SECONDS);
 	}
 
 	private void parMissed(){
 		Platform.runLater(() -> {
 			setShotTimerRowColor(Color.CORAL);
 			final long drawShotLength = (System.currentTimeMillis() - roundStartTime); // s
-			Shot fauxShot = new Shot(ShotColor.RED, 0.0,0.0, drawShotLength);
+			Shot fauxShot = new Shot(ShotColor.RED, -10.0,-10.0, drawShotLength);
 			this.getArenaPane().getCanvasManager().addShot(new DisplayShot(fauxShot, config.getMarkerRadius()), true);
+
+			ArenaShot fauxArenaShot = new ArenaShot(new DisplayShot(fauxShot, config.getMarkerRadius()));
+ 			recordShot(fauxArenaShot, Optional.empty(), true);
 		});
 
 		setLength();
@@ -375,17 +444,17 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		setLastTime("Par missed!");
 	}
 
-	protected void endRound(){
+	protected void checkDrillComplete(){
 		if(round >= roundLimit){
+			isDrillComplete = true;
 			repeatExercise = false;
-			pauseShotDetection(false);
-			shootToReset = true;
-			displayResults();
+
+			executorService.schedule(() -> {
+				//wait 4 seconds to reactivate shot detection
+				pauseShotDetection(false);
+				shootToReset = true;
+			}, 4, TimeUnit.SECONDS);
 		}
-	}
-
-	private void displayResults(){
-
 	}
 
 	private void randomizeTargets(){
@@ -403,9 +472,9 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 
 	private void drawShot(ArenaShot shot){
 		Platform.runLater(() -> {
-			Group canvasGroup = this.getArenaPane().getCanvasManager().getCanvasGroup();
+			Group canvasGroup = getArenaPane().getCanvasManager().getCanvasGroup();
 			int shotIdx = canvasGroup.getChildren().indexOf(shot.getMarker());
-			Ellipse marker = (Ellipse)this.getArenaPane().getCanvasManager().getCanvasGroup().getChildren().get(shotIdx);
+			Ellipse marker = (Ellipse)getArenaPane().getCanvasManager().getCanvasGroup().getChildren().get(shotIdx);
 			marker.setVisible(true);
 		});
 	}
@@ -414,6 +483,9 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		for (TrackedShot trackedShot : trackedShots) {
 			Group canvasGroup = getArenaPane().getCanvasManager().getCanvasGroup();
 			int shotIdx = canvasGroup.getChildren().indexOf(trackedShot.getArenaShot().getMarker());
+			if(shotIdx == -1){
+				continue;
+			}
 			Ellipse marker = (Ellipse)canvasGroup.getChildren().get(shotIdx);
 			marker.setVisible(false);
 		}
@@ -440,6 +512,12 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		Platform.runLater(() -> {
 			timeLabel.setText(time);
 			timeLabel.setVisible(true);
+		});
+	}
+
+	private void setResultsLabel(){
+		Platform.runLater(() -> {
+
 		});
 	}
 
@@ -474,8 +552,13 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 
 	private void resetValues() {
 		shootToReset = false;
+		isDrillComplete = false;
+		repeatExercise = true;
+		roundStartTime = 0;
 		score = 0;
 		round = 0;
+		trackedShots.clear();
+
 		showTextOnFeed("Score: 0");
 		updateRoundLabel();
 		hideLastTime();
@@ -517,19 +600,19 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 
 	private static class TrackedShot {
 		private ArenaShot arenaShot;
+		private Hit hit;
 		float shotTime;
-		int points;
 		Point2D arenaShotPos;
 		Point2D targetPos;
-		Point2D hitPos;
+		boolean missedPar;
 
-		public TrackedShot(ArenaShot arenaShot, Point2D targetPos, Point2D arenaShotPos, Point2D hitPos, float shotTime, int points) {
+		public TrackedShot(ArenaShot arenaShot, Point2D targetPos, Point2D arenaShotPos, Hit hit, float shotTime, boolean missedPar) {
 			this.arenaShot = arenaShot;
+			this.hit = hit;
 			this.arenaShotPos = arenaShotPos;
 			this.targetPos = targetPos;
-			this.hitPos = hitPos;
 			this.shotTime = shotTime;
-			this.points = points;
+			this.missedPar = missedPar;
 		}
 
 		public ArenaShot getArenaShot() {
@@ -541,7 +624,19 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		}
 
 		public int getPoints() {
+			int points = 0;
+			if(hit != null) {
+				final TargetRegion r = hit.getHitRegion();
+				if (r.tagExists("points")) {
+					String pointsStr = r.getTag("points");
+					points = Integer.parseInt(pointsStr);
+				}
+			}
 			return points;
+		}
+
+		public Hit getHit(){
+			return hit;
 		}
 
 		public Point2D getArenaShotPos() {
@@ -552,11 +647,10 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			return targetPos;
 		}
 
-		public Point2D getHitPos() {
-			return hitPos;
+		public boolean isMissedPar() {
+			return missedPar;
 		}
 	}
-
 
 	private static class LimitRoundsPane extends GridPane {
 		public LimitRoundsPane(RoundLimitListener listener) {
