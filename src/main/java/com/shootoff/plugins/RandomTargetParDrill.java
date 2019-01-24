@@ -419,8 +419,11 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			float avgTime = timeTotal / numShots;
 			float avgPoints = (float)pointsTotal / numShots;
 
+			float normalizedScore = (1/avgTime) * avgPoints;
+			float normalizedScore2 = (1/timeTotal) * pointsTotal;
+
 			logger.info(String.format("Total Points: %d, Total Time: %.2f; Average Points: %.3f; Average Time: %.3f; Missed Shots: %d; Missed Par: %d", pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses));
-			String message = String.format("TotalShots: %d\nTotal Points: %d\nTotal Time: %.2f\nAverage Points: %.3f\nAverage Time: %.3f\nMissed Shots: %d\nMissed Par: %d", numShots, pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses);
+			String message = String.format("Total Shots: %d\nTotal Points: %d\nTotal Time: %.2f\nAverage Points: %.3f\nAverage Time: %.3f\nMissed Shots: %d\nMissed Par: %d\nNormalized Score: %.3f\nNormalized Score2: %.3f", numShots, pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses, normalizedScore, normalizedScore2);
 			showTextOnFeed(message);
 
 		});
