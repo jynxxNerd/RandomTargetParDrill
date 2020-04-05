@@ -31,10 +31,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.InputStream;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -52,13 +49,11 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	private static final String POINTS_COL_NAME = "Score";
 	private static final int POINTS_COL_WIDTH = 60;
 
-	private static final int MAX_ROUNDS = 10;
 	private static final int START_DELAY = 10; // s
 	private static final int RESUME_DELAY = 5; // s
 	private static final int CORE_POOL_SIZE = 2;
 
 	private Target target;
-
 	private Button pauseResumeButton;
 	private final Label roundLabel = new Label();
 	private final Label timeLabel = new Label();
@@ -67,10 +62,14 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	private ScheduledExecutorService executorService = Executors.newScheduledThreadPool(CORE_POOL_SIZE,
 			new NamedThreadFactory("RandomScoredTargetWithParLimitedShot"));
 
-	private double parTime = 2.0;
-	private int delayMin = 4;
-	private int delayMax = 8;
-	private int roundLimit = MAX_ROUNDS;
+	private static final double DEFAULT_PAR_TIME  = 4.0;
+	private static final int DEFAULT_MIN_DELAY = 5;
+	private static final int DEFAULT_MAX_DELAY = 8;
+	private static final int DEFAULT_MAX_ROUNDS = 10;
+	private double parTime = DEFAULT_PAR_TIME;
+	private int delayMin = DEFAULT_MIN_DELAY;
+	private int delayMax = DEFAULT_MAX_DELAY;
+	private int roundLimit = DEFAULT_MAX_ROUNDS;
 	private boolean repeatExercise = true;
 	private boolean countScore = false;
 	private boolean shootToReset = false;
@@ -387,19 +386,30 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			int numMisses = 0;
 			int numParMisses = 0;
 			int pointsTotal = 0;
+			float maxTime = 0;
+			float minTime = 1000;
+			float maxScore = 0;
+			float minScore = 1000;
 
 			Group canvasGroup = getArenaPane().getCanvasManager().getCanvasGroup();
 			for (TrackedShot trackedShot : trackedShots) {
 				logger.info(String.format("Shot %d: %.2f - par time = %.2f", numShots, trackedShot.getShotTime(), parTime));
 				numShots++;
-				timeTotal += trackedShot.getShotTime();
 				if(trackedShot.getHit() == null && !trackedShot.isMissedPar()){
 					numMisses++;
 				}
 				if(trackedShot.isMissedPar()){
 					numParMisses++;
 				}
-				pointsTotal += trackedShot.getPoints();
+				float shotTime = trackedShot.getShotTime();
+				timeTotal += shotTime;
+				minTime = Math.min(shotTime, minTime);
+				maxTime = Math.max(shotTime, maxTime);
+
+				int points = trackedShot.getPoints();
+				pointsTotal += points;
+				minScore = Math.min(points, minScore);
+				maxScore = Math.max(points, maxScore);
 
 				Point2D targetPos = target.getPosition();
 				Point2D shotTargetPos = trackedShot.getTargetPos();
@@ -419,11 +429,9 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			float avgTime = timeTotal / numShots;
 			float avgPoints = (float)pointsTotal / numShots;
 
-			float normalizedScore = (1/avgTime) * avgPoints;
-			float normalizedScore2 = (1/timeTotal) * pointsTotal;
 
 			logger.info(String.format("Total Points: %d, Total Time: %.2f; Average Points: %.3f; Average Time: %.3f; Missed Shots: %d; Missed Par: %d", pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses));
-			String message = String.format("Total Shots: %d\nTotal Points: %d\nTotal Time: %.2f\nAverage Points: %.3f\nAverage Time: %.3f\nMissed Shots: %d\nMissed Par: %d\nNormalized Score: %.3f\nNormalized Score2: %.3f", numShots, pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses, normalizedScore, normalizedScore2);
+			String message = String.format("Total Shots: %d\nTotal Points: %d\nTotal Time: %.2f\nAverage Points: %.3f\nAverage Time: %.3f\nPoints min/max: %.2f/%.2f\nTimes min/max: %.3f/%.3f\nMissed Shots: %d\nMissed Par: %d", numShots, pointsTotal, timeTotal, avgPoints, avgTime, minScore, maxScore, minTime, maxTime, numMisses, numParMisses);
 			showTextOnFeed(message);
 
 		});
@@ -601,6 +609,11 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 		this.roundLimit = limit;
 	}
 
+	@Override
+	public int getRoundLimit() {
+		return this.roundLimit;
+	}
+
 	private static class TrackedShot {
 		private ArenaShot arenaShot;
 		private Hit hit;
@@ -666,7 +679,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			this.add(instructionsLabel, 0, 0, 2, 3);
 			addRow(3, new Label("Shots per round"));
 
-			final TextField limitField = new TextField(String.valueOf(MAX_ROUNDS));
+			final TextField limitField = new TextField(String.valueOf(listener.getRoundLimit()));
 			this.add(limitField, 1, 3);
 
 			limitField.textProperty().addListener((observable, oldValue, newValue) -> {

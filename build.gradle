@@ -1,12 +1,4 @@
 apply plugin: 'java'
-apply plugin: 'eclipse'
-
-eclipse {
-    jdt {
-        sourceCompatibility = 1.8
-        targetCompatibility = 1.8
-    }
-}
 
 repositories {
     jcenter()
@@ -19,4 +11,9 @@ repositories {
 dependencies{
     compile name: "ShootOFF" //project(":ShootOFF")
     compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.25'
+}
+
+task copyPlugin(type: Copy){
+    from jar.outputs
+    into file("../ShootOFF/build/dist/exercises/")
 }
