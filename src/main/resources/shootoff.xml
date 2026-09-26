@@ -1,2 +1,2 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<shootoffExercise exerciseClass="com.shootoff.plugins.RandomTargetParDrill" />
+<shootoffExercise apiVersion="2" exerciseClass="com.shootoff.plugins.RandomTargetParDrill" />

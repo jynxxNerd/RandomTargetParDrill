@@ -1,6 +1,5 @@
 plugins {
     java
-    id("org.openjfx.javafxplugin") version "0.1.0"
 }
 
 java {
@@ -10,23 +9,29 @@ java {
 }
 
 repositories {
-    // ShootOFF itself: run `./gradlew publishToMavenLocal` in the ShootOFF project first
+    // ShootOFF's plugin API: run `./gradlew publishToMavenLocal` in the ShootOFF project first
     mavenLocal()
     mavenCentral()
 }
 
-javafx {
-    version = "21.0.12"
-    modules("javafx.controls")
-    // ShootOFF provides JavaFX at runtime
-    configuration = "compileOnly"
-}
+val shootoffVersion = "5.0.0-SNAPSHOT"
 
 dependencies {
-    // Provided by ShootOFF at runtime, so none of it goes into the plugin jar
-    compileOnly("com.shootoff:shootoff:5.0.0-SNAPSHOT") { isTransitive = false }
+    // Provided by ShootOFF at runtime, so none of it goes into the plugin jar. Not transitive: core's
+    // own libraries (OpenCV, MaryTTS, ...) aren't needed to compile an exercise, and some aren't on
+    // Maven Central
+    compileOnly("com.shootoff:plugin-api:$shootoffVersion") { isTransitive = false }
+    compileOnly("com.shootoff:core:$shootoffVersion") { isTransitive = false }
     compileOnly("org.slf4j:slf4j-api:2.0.20")
 
+    testImplementation("com.shootoff:plugin-api:$shootoffVersion") { isTransitive = false }
+    testImplementation("com.shootoff:core:$shootoffVersion") { isTransitive = false }
+    // FakeExerciseHost, from plugin-api's test fixtures
+    testImplementation("com.shootoff:plugin-api:$shootoffVersion") {
+        isTransitive = false
+        capabilities { requireCapability("com.shootoff:plugin-api-test-fixtures") }
+    }
+    testImplementation("org.slf4j:slf4j-api:2.0.20")
     testImplementation(platform("org.junit:junit-bom:5.14.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -34,6 +39,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.jar {
+    // Installed next to the v1 drill's RandomTargetParDrill.jar rather than over it
+    archiveFileName = "RandomTargetParDrill-v2.jar"
 }
 
 // Directory of the ShootOFF install to copy the plugin into; override with -PshootoffHome=...
