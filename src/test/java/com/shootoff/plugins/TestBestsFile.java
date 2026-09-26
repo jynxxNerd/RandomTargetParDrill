@@ -62,4 +62,51 @@ class TestBestsFile {
 		assertFalse(Files.exists(bests));
 		assertEquals(Optional.empty(), new PersonalBests(bests).best(KEY));
 	}
+
+	@Test
+	void aCopyThatFailsPartwayLeavesNothingAtTheFinalPath() throws IOException {
+		Files.writeString(home.resolve(RandomTargetParDrill.BESTS_FILE), KEY + "=6.5\n");
+
+		final Path bests = BestsFile.locate(data, home, (source, target) -> {
+			// A copy that got partway through before failing (disk full, killed process, ...)
+			Files.writeString(target, "not a complete copy");
+			throw new IOException("Simulated failure partway through the copy");
+		});
+
+		assertFalse(Files.exists(bests));
+		assertEquals(0, dataDirectoryFileCount(), "no temporary file left behind either");
+	}
+
+	@Test
+	void aFailedCopyDoesNotPreventALaterSuccessfulCopy() throws IOException {
+		Files.writeString(home.resolve(RandomTargetParDrill.BESTS_FILE), KEY + "=6.5\n");
+
+		BestsFile.locate(data, home, (source, target) -> {
+			throw new IOException("Simulated failure partway through the copy");
+		});
+
+		final Path bests = BestsFile.locate(data, home);
+
+		assertEquals(Optional.of(6.5), new PersonalBests(bests).best(KEY));
+	}
+
+	@Test
+	void aRaceToWriteTheBestsFileKeepsWhicheverFinishedFirst() throws IOException {
+		Files.writeString(home.resolve(RandomTargetParDrill.BESTS_FILE), KEY + "=6.5\n");
+
+		final Path bests = BestsFile.locate(data, home, (source, target) -> {
+			// Another run's copy finishes first, between our copy and our move
+			Files.writeString(data.resolve(RandomTargetParDrill.BESTS_FILE), KEY + "=9.0\n");
+			Files.copy(source, target);
+		});
+
+		assertEquals(KEY + "=9.0\n", Files.readString(bests));
+		assertEquals(1, dataDirectoryFileCount(), "no temporary file left behind either");
+	}
+
+	private long dataDirectoryFileCount() throws IOException {
+		try (var files = Files.list(data)) {
+			return files.count();
+		}
+	}
 }
