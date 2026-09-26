@@ -30,6 +30,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -67,6 +69,10 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 	private static final int DEFAULT_MAX_DELAY = 8;
 	private static final int DEFAULT_MAX_ROUNDS = 10;
 	private double parTime = DEFAULT_PAR_TIME;
+
+	private final PersonalBests personalBests = new PersonalBests(
+			Paths.get(System.getProperty("shootoff.home", System.getProperty("user.dir")),
+					"RandomTargetParDrill-bests.properties"));
 	private int delayMin = DEFAULT_MIN_DELAY;
 	private int delayMax = DEFAULT_MAX_DELAY;
 	private int roundLimit = DEFAULT_MAX_ROUNDS;
@@ -94,7 +100,7 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 
 	@Override
 	public ExerciseMetadata getInfo() {
-		return new ExerciseMetadata("Random Target PAR Drill with Score", "1.0", "Benjamin Fears",
+		return new ExerciseMetadata("Random Target PAR Drill with Score", "1.1", "Benjamin Fears",
 				"Shoot a randomly placed target as fast as you can.");
 	}
 
@@ -430,13 +436,28 @@ public class RandomTargetParDrill extends ProjectorTrainingExerciseBase implemen
 			float avgPoints = (float)pointsTotal / numShots;
 
 
-			logger.info(String.format("Total Points: %d, Total Time: %.2f; Average Points: %.3f; Average Time: %.3f; Missed Shots: %d; Missed Par: %d", pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses));
-			String message = String.format("Total Shots: %d\nTotal Points: %d\nTotal Time: %.2f\nAverage Points: %.3f\nAverage Time: %.3f\nPoints min/max: %.2f/%.2f\nTimes min/max: %.3f/%.3f\nMissed Shots: %d\nMissed Par: %d", numShots, pointsTotal, timeTotal, avgPoints, avgTime, minScore, maxScore, minTime, maxTime, numMisses, numParMisses);
+			final double hitFactor = HitFactor.compute(pointsTotal, numMisses, numParMisses, timeTotal);
+
+			logger.info(String.format("Total Points: %d, Total Time: %.2f; Average Points: %.3f; Average Time: %.3f; Missed Shots: %d; Missed Par: %d; Hit Factor: %.2f", pointsTotal, timeTotal, avgPoints, avgTime, numMisses, numParMisses, hitFactor));
+			String message = hitFactorSummary(hitFactor) + "\n\n" + String.format("Total Shots: %d\nTotal Points: %d\nTotal Time: %.2f\nAverage Points: %.3f\nAverage Time: %.3f\nPoints min/max: %.2f/%.2f\nTimes min/max: %.3f/%.3f\nMissed Shots: %d\nMissed Par: %d", numShots, pointsTotal, timeTotal, avgPoints, avgTime, minScore, maxScore, minTime, maxTime, numMisses, numParMisses);
 			showTextOnFeed(message);
 
 		});
 
 		executorService.schedule(this::hideLastTime, 1, TimeUnit.SECONDS);
+	}
+
+	private String hitFactorSummary(double hitFactor) {
+		final String settingsKey = PersonalBests.settingsKey(roundLimit, parTime);
+
+		try {
+			final Optional<Double> previousBest = personalBests.best(settingsKey);
+			personalBests.recordIfBest(settingsKey, hitFactor);
+			return HitFactorSummary.format(hitFactor, roundLimit, parTime, previousBest);
+		} catch (final IOException e) {
+			logger.error("Could not read or save personal best hit factors", e);
+			return HitFactorSummary.format(hitFactor, roundLimit, parTime);
+		}
 	}
 
 	private void parMissed(){

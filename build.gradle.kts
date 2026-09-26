@@ -26,6 +26,14 @@ dependencies {
     // Provided by ShootOFF at runtime, so none of it goes into the plugin jar
     compileOnly("com.shootoff:shootoff:5.0.0-SNAPSHOT") { isTransitive = false }
     compileOnly("org.slf4j:slf4j-api:2.0.20")
+
+    testImplementation(platform("org.junit:junit-bom:5.14.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 // Directory of the ShootOFF install to copy the plugin into; override with -PshootoffHome=...
