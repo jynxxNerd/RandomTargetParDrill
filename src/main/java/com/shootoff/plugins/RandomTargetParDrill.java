@@ -90,6 +90,8 @@ public class RandomTargetParDrill implements Exercise {
 	private boolean countScore = false;
 	private boolean shootToReset = false;
 	private boolean hadShot = false;
+	// Paused during the current round's par time: its end leaves the next round to the resume
+	private boolean pausedDuringRound = false;
 	private boolean isDrillComplete = false;
 	private long beepTime = 0;
 	private long roundStartTime = 0;
@@ -219,7 +221,13 @@ public class RandomTargetParDrill implements Exercise {
 	}
 
 	private void schedule(Runnable task, Duration delay) {
-		pending.add(host.schedule(task, delay));
+		// Tasks run on the exercise thread, so this one can't run before it is in the list
+		final Cancellable[] handle = new Cancellable[1];
+		handle[0] = host.schedule(() -> {
+			pending.remove(handle[0]);
+			task.run();
+		}, delay);
+		pending.add(handle[0]);
 	}
 
 	// The drill's next step (make ready, or a round): at most one is pending
@@ -245,6 +253,7 @@ public class RandomTargetParDrill implements Exercise {
 			paused = true;
 			pauseResumeButton.setLabel(RESUME);
 			repeatExercise = false;
+			if (countScore) pausedDuringRound = true;
 			host.pauseShotDetection(true);
 			nextStep.ifPresent(Cancellable::cancel);
 			nextStep = Optional.empty();
@@ -268,6 +277,7 @@ public class RandomTargetParDrill implements Exercise {
 		if (!repeatExercise) return;
 
 		countScore = true;
+		pausedDuringRound = false;
 		round++;
 		host.playSound(BEEP_WAV);
 
@@ -295,7 +305,8 @@ public class RandomTargetParDrill implements Exercise {
 		checkDrillComplete();
 
 		final int nextDelay = setupRound();
-		scheduleNextStep(this::startRound, Duration.ofSeconds(nextDelay));
+		// After a pause in this round, the resume starts the next one (5 s, then "make ready")
+		if (!pausedDuringRound) scheduleNextStep(this::startRound, Duration.ofSeconds(nextDelay));
 
 		if (isDrillComplete) schedule(this::displayResults, RESULTS_DELAY);
 	}
@@ -484,6 +495,10 @@ public class RandomTargetParDrill implements Exercise {
 	private void resetValues() {
 		shootToReset = false;
 		isDrillComplete = false;
+		// A reset during a round (after a shot, or a pause) mustn't carry over into the next one
+		hadShot = false;
+		countScore = false;
+		pausedDuringRound = false;
 		repeatExercise = true;
 		roundStartTime = 0;
 		score = 0;

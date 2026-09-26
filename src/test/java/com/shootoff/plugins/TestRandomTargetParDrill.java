@@ -198,6 +198,65 @@ class TestRandomTargetParDrill {
 	}
 
 	@Test
+	void resetAfterAShotStillCountsTheNextRoundsParMiss() {
+		startDrill(1);
+
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		host.reset();
+
+		// 5 s after the reset: "make ready", then the round 1 s later, and its par time runs out
+		host.advance(Duration.ofSeconds(6));
+		assertTrue(host.isVisible(target()));
+		host.advance(Duration.ofSeconds(2));
+		assertEquals("Par missed!", timeText());
+
+		assertEquals(1, host.rows().size());
+		final FakeExerciseHost.Row row = host.rows().get(0);
+		assertEquals(Optional.empty(), row.shot());
+		assertEquals(2000, row.timeMillis());
+		assertEquals(Optional.of(new RowStyle("coral")), row.style());
+		assertEquals("0", row.values().get(RandomTargetParDrill.POINTS_COL_NAME));
+
+		host.advance(Duration.ofSeconds(1));
+		assertTrue(scoreText().contains("\nTotal Shots: 1\nTotal Points: 0\n"), scoreText());
+		assertTrue(scoreText().endsWith("\nMissed Shots: 0\nMissed Par: 1"), scoreText());
+	}
+
+	@Test
+	void pauseAndResumeDuringTheParTimeRestartTheCountdown() {
+		startDrill(2);
+		final List<String> firstRound = List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV);
+		assertEquals(firstRound, host.sounds());
+
+		host.advance(Duration.ofMillis(500));
+		host.click(RandomTargetParDrill.PAUSE);
+		host.advance(Duration.ofMillis(100));
+		host.click(RandomTargetParDrill.RESUME);
+
+		// The par time still ends with the buzzer, but the next round waits for the resume: 5 s after
+		// it, "make ready", then the round after the random delay
+		host.advance(Duration.ofMillis(4900));
+		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
+				RandomTargetParDrill.BUZZER_WAV), host.sounds());
+		host.advance(Duration.ofMillis(100));
+		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
+				RandomTargetParDrill.BUZZER_WAV, RandomTargetParDrill.MAKE_READY_WAV), host.sounds());
+		host.advance(Duration.ofMillis(999));
+		assertEquals(4, host.sounds().size());
+		host.advance(Duration.ofMillis(1));
+		assertEquals(RandomTargetParDrill.BEEP_WAV, host.sounds().get(4));
+		assertEquals(Optional.of("Round: 2/2"), roundText());
+
+		// One round chain: round 2 ends the drill, and nothing else starts
+		host.advance(Duration.ofSeconds(30));
+		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
+				RandomTargetParDrill.BUZZER_WAV, RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
+				RandomTargetParDrill.BUZZER_WAV), host.sounds());
+		assertTrue(scoreText().endsWith("\nMissed Par: 2"), scoreText());
+	}
+
+	@Test
 	void summaryComparesTheHitFactorWithThePersonalBest() throws IOException {
 		final Path bests = temp.resolve("data").resolve(RandomTargetParDrill.BESTS_FILE);
 		Files.writeString(bests, "1rounds-2.00spar=40.0\n");
