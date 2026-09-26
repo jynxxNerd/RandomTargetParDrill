@@ -98,6 +98,9 @@ public class RandomTargetParDrill implements Exercise {
 	private float shotTime;
 	private int score = 0;
 	private int round = 0;
+	// Where the running round started in the tracked shots and the score, to drop it if abandoned
+	private int roundFirstShot = 0;
+	private int roundStartScore = 0;
 
 	/**
 	 * A shot or a par miss, with where the target was at the time
@@ -280,6 +283,8 @@ public class RandomTargetParDrill implements Exercise {
 
 		countScore = true;
 		round++;
+		roundFirstShot = trackedShots.size();
+		roundStartScore = score;
 		host.playSound(BEEP_WAV);
 
 		randomizeTarget();
@@ -293,15 +298,23 @@ public class RandomTargetParDrill implements Exercise {
 		roundEnd = Optional.of(host.schedule(this::endRound, Duration.ofMillis(Math.round(parTime * 1000))));
 	}
 
-	// A pause during the par time ends the round there: its end is cancelled, so it can never act on a
-	// later round, and nothing of it is scored beyond the shots already fired (no par miss, no
-	// buzzer). The resume starts the next round, 5 s after it with "make ready".
+	// A pause during the par time abandons the round: its end is cancelled, so it can never act on a
+	// later round, and it doesn't count. Its shots are dropped from the score and the summary, with
+	// no par miss and no buzzer, and the resume replays it (5 s after it, with "make ready"), so a
+	// finished drill always has the full number of scored rounds.
 	private void abandonRound() {
 		roundEnd.ifPresent(Cancellable::cancel);
 		roundEnd = Optional.empty();
 		countScore = false;
 		hadShot = false;
 		hideTargetAndShots();
+
+		round--;
+		trackedShots.subList(roundFirstShot, trackedShots.size()).clear();
+		score = roundStartScore;
+		showOnFeeds(String.format("Score: %d", score));
+		roundText.setText(roundLabel());
+		hideLastTime();
 	}
 
 	private void endRound() {

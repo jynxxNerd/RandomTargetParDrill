@@ -246,15 +246,17 @@ class TestRandomTargetParDrill {
 		assertEquals(3, host.sounds().size());
 		host.advance(Duration.ofMillis(1));
 		assertEquals(RandomTargetParDrill.BEEP_WAV, host.sounds().get(3));
-		assertEquals(Optional.of("Round: 2/2"), roundText());
+		// The abandoned round doesn't count: round 1 again
+		assertEquals(Optional.of("Round: 1/2"), roundText());
 
-		// One round chain: round 2 ends the drill, and nothing else starts
+		// One round chain: the replayed round 1, then round 2 ends the drill, and nothing else starts
 		host.advance(Duration.ofSeconds(30));
 		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
-				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV),
-				host.sounds());
-		assertEquals(1, host.rows().size());
-		assertTrue(scoreText().endsWith("\nMissed Par: 1"), scoreText());
+				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV,
+				RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV), host.sounds());
+		assertEquals(2, host.rows().size());
+		assertTrue(scoreText().startsWith("Hit Factor: 0.00   (2 rounds, 2.00 s par)\n"), scoreText());
+		assertTrue(scoreText().endsWith("\nMissed Par: 2"), scoreText());
 	}
 
 	@Test
@@ -271,36 +273,95 @@ class TestRandomTargetParDrill {
 		host.advance(Duration.ofMillis(100));
 		host.click(RandomTargetParDrill.RESUME);
 
-		// Round 2 starts 5 s after the resume, then 1 s: at 17.6 s
+		// The abandoned round 1 is replayed 5 s after the resume, then 1 s: at 17.6 s
 		host.advance(Duration.ofSeconds(6));
 		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
 				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV), host.sounds());
-		assertEquals(Optional.of("Round: 2/2"), roundText());
+		assertEquals(Optional.of("Round: 1/2"), roundText());
 
 		host.advance(Duration.ofMillis(500));
 		shootCenter();
 		assertEquals("10 points   -  0.500 seconds", timeText());
 
-		// Past round 1's old par end (26 s): round 2 is still the one running
+		// Past the abandoned round's old par end (26 s): the replayed round is still the one running
 		host.advance(Duration.ofSeconds(9));
 		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
 				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV), host.sounds());
 		assertTrue(host.isVisible(target()));
 		assertFalse(host.isShotDetectionPaused());
-		assertEquals(Optional.of("Round: 2/2"), roundText());
+		// The abandoned round doesn't count: this is round 1 again
+		assertEquals(Optional.of("Round: 1/2"), roundText());
 
-		// Round 2's own par time ends at 32.6 s, with its shot scored; then the summary, and nothing more
+		// The replayed round's own par time ends at 32.6 s, with its shot scored; round 2 starts 1 s later
+		host.advance(Duration.ofSeconds(7));
+		assertEquals(Optional.of("Round: 2/2"), roundText());
+		shootCenter();
+
+		// Round 2 ends the drill at 48.6 s; then the summary, and nothing more
 		host.advance(Duration.ofSeconds(30));
 		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
-				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV),
-				host.sounds());
-		assertEquals(1, host.rows().size());
-		assertEquals("0.50", host.rows().get(0).values().get(RandomTargetParDrill.LENGTH_COL_NAME));
-		assertEquals("10", host.rows().get(0).values().get(RandomTargetParDrill.POINTS_COL_NAME));
+				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV,
+				RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV), host.sounds());
+		assertEquals(2, host.rows().size());
+		for (final FakeExerciseHost.Row row : host.rows()) {
+			assertEquals("0.50", row.values().get(RandomTargetParDrill.LENGTH_COL_NAME));
+			assertEquals("10", row.values().get(RandomTargetParDrill.POINTS_COL_NAME));
+		}
 		assertEquals("Hit Factor: 20.00   (2 rounds, 15.00 s par)\nNew personal best!\n\n"
-				+ "Total Shots: 1\nTotal Points: 10\nTotal Time: 0.50\nAverage Points: 10.000\n"
+				+ "Total Shots: 2\nTotal Points: 20\nTotal Time: 1.00\nAverage Points: 10.000\n"
 				+ "Average Time: 0.500\nPoints min/max: 10.00/10.00\nTimes min/max: 0.500/0.500\n"
 				+ "Missed Shots: 0\nMissed Par: 0", scoreText());
+	}
+
+	@Test
+	void roundAbandonedByAPauseIsReplayedAndScoredOnce() {
+		startDrill(3);
+
+		// Round 1 at 11 s: a center shot; round 2 at 14 s
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		host.advance(Duration.ofMillis(2500));
+		assertEquals(Optional.of("Round: 2/3"), roundText());
+
+		// A shot in round 2, then a pause that abandons it, and a resume
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		assertTrue(host.messages().contains("Score: 20"));
+		host.advance(Duration.ofMillis(100));
+		host.click(RandomTargetParDrill.PAUSE);
+		assertEquals("Score: 10", scoreText());
+		assertFalse(host.isVisible(target()));
+		assertEquals(List.of(), host.shotMarkers());
+		host.advance(Duration.ofMillis(100));
+		host.click(RandomTargetParDrill.RESUME);
+
+		// Round 2 again, 5 s after the resume and then 1 s: at 20.7 s
+		host.advance(Duration.ofSeconds(6));
+		assertEquals(Optional.of("Round: 2/3"), roundText());
+		assertTrue(host.isVisible(target()));
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		assertEquals("Score: 20", scoreText());
+
+		// Round 3 at 23.7 s
+		host.advance(Duration.ofMillis(2500));
+		assertEquals(Optional.of("Round: 3/3"), roundText());
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		host.advance(Duration.ofMillis(2500));
+
+		assertEquals(4, count(host.sounds(), RandomTargetParDrill.BEEP_WAV));
+		assertEquals(3, count(host.sounds(), RandomTargetParDrill.BUZZER_WAV));
+		assertFalse(host.messages().contains("Score: 40"));
+		assertEquals("Hit Factor: 20.00   (3 rounds, 2.00 s par)\nNew personal best!\n\n"
+				+ "Total Shots: 3\nTotal Points: 30\nTotal Time: 1.50\nAverage Points: 10.000\n"
+				+ "Average Time: 0.500\nPoints min/max: 10.00/10.00\nTimes min/max: 0.500/0.500\n"
+				+ "Missed Shots: 0\nMissed Par: 0", scoreText());
+		assertEquals(3, host.shotMarkers().size());
+
+		// Nothing more starts
+		host.advance(Duration.ofSeconds(30));
+		assertEquals(4, count(host.sounds(), RandomTargetParDrill.BEEP_WAV));
 	}
 
 	@Test
