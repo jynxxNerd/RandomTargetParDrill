@@ -1,6 +1,7 @@
 package com.shootoff.plugins;
 
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -125,7 +126,8 @@ public class RandomTargetParDrill implements Exercise {
 	@Override
 	public void start(ExerciseHost host) {
 		this.host = host;
-		personalBests = new PersonalBests(host.dataDirectory().resolve(BESTS_FILE));
+		personalBests = new PersonalBests(BestsFile.locate(host.dataDirectory(),
+				Paths.get(System.getProperty("shootoff.home", System.getProperty("user.dir")))));
 
 		target = host.addTarget(TARGET_FILE, 0, 0)
 				.orElseThrow(() -> new IllegalStateException("Can't load " + TARGET_FILE));

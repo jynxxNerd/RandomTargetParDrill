@@ -29,19 +29,25 @@ import com.shootoff.geom.Point;
 class TestRandomTargetParDrill {
 	@TempDir Path temp;
 	private Locale previousLocale;
+	private String previousHome;
 	private FakeExerciseHost host;
 
 	@BeforeEach
-	void setUp() {
+	void setUp() throws IOException {
 		previousLocale = Locale.getDefault();
 		// The drill formats times in the default locale, as it always has
 		Locale.setDefault(Locale.US);
+		// Where the v1 drill kept its bests; empty unless a test writes there
+		previousHome = System.getProperty("shootoff.home");
+		System.setProperty("shootoff.home", Files.createDirectories(temp.resolve("home")).toString());
 		host = new FakeExerciseHost(FakeExerciseHost.DEFAULT_SURFACE, true, temp.resolve("data"));
 	}
 
 	@AfterEach
 	void tearDown() {
 		Locale.setDefault(previousLocale);
+		if (previousHome == null) System.clearProperty("shootoff.home");
+		else System.setProperty("shootoff.home", previousHome);
 	}
 
 	// Starts a drill of the given rounds with a 1 s start delay and a 2 s par time, and runs it to its
@@ -378,5 +384,21 @@ class TestRandomTargetParDrill {
 				+ "50% of personal best (40.00)\n\nTotal Shots: 1\nTotal Points: 10\n"), scoreText());
 		// A worse run keeps the best
 		assertEquals(Optional.of(40.0), new PersonalBests(bests).best("1rounds-2.00spar"));
+	}
+
+	@Test
+	void theFirstV2RunCountsTheV1PersonalBest() throws IOException {
+		final Path legacy = temp.resolve("home").resolve(RandomTargetParDrill.BESTS_FILE);
+		Files.writeString(legacy, "1rounds-2.00spar=40.0\n");
+
+		startDrill(1);
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		host.advance(Duration.ofMillis(2500));
+
+		assertTrue(scoreText().startsWith("Hit Factor: 20.00   (1 rounds, 2.00 s par)\n"
+				+ "50% of personal best (40.00)\n"), scoreText());
+		// The v1 drill's file is untouched
+		assertEquals("1rounds-2.00spar=40.0\n", Files.readString(legacy));
 	}
 }
