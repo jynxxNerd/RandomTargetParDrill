@@ -234,26 +234,73 @@ class TestRandomTargetParDrill {
 		host.advance(Duration.ofMillis(100));
 		host.click(RandomTargetParDrill.RESUME);
 
-		// The par time still ends with the buzzer, but the next round waits for the resume: 5 s after
+		// The pause ended the round, with no par miss; the next round waits for the resume: 5 s after
 		// it, "make ready", then the round after the random delay
+		assertFalse(host.isVisible(target()));
 		host.advance(Duration.ofMillis(4900));
-		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
-				RandomTargetParDrill.BUZZER_WAV), host.sounds());
+		assertEquals(firstRound, host.sounds());
 		host.advance(Duration.ofMillis(100));
 		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
-				RandomTargetParDrill.BUZZER_WAV, RandomTargetParDrill.MAKE_READY_WAV), host.sounds());
+				RandomTargetParDrill.MAKE_READY_WAV), host.sounds());
 		host.advance(Duration.ofMillis(999));
-		assertEquals(4, host.sounds().size());
+		assertEquals(3, host.sounds().size());
 		host.advance(Duration.ofMillis(1));
-		assertEquals(RandomTargetParDrill.BEEP_WAV, host.sounds().get(4));
+		assertEquals(RandomTargetParDrill.BEEP_WAV, host.sounds().get(3));
 		assertEquals(Optional.of("Round: 2/2"), roundText());
 
 		// One round chain: round 2 ends the drill, and nothing else starts
 		host.advance(Duration.ofSeconds(30));
 		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
-				RandomTargetParDrill.BUZZER_WAV, RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
-				RandomTargetParDrill.BUZZER_WAV), host.sounds());
-		assertTrue(scoreText().endsWith("\nMissed Par: 2"), scoreText());
+				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV),
+				host.sounds());
+		assertEquals(1, host.rows().size());
+		assertTrue(scoreText().endsWith("\nMissed Par: 1"), scoreText());
+	}
+
+	@Test
+	void pausedRoundEndsAtThePauseEvenWhenItsParTimeOutlastsTheResume() {
+		host.start(new RandomTargetParDrill(new Random(42)));
+		host.changeDelayedStart(new DelayRange(1, 1));
+		host.changeParTime(15.0);
+		host.changeSetting(RandomTargetParDrill.ROUNDS_SETTING, 2);
+		host.advance(Duration.ofSeconds(11));
+
+		// Round 1 starts at 11 s; pause and resume in its par time, which would run to 26 s
+		host.advance(Duration.ofMillis(500));
+		host.click(RandomTargetParDrill.PAUSE);
+		host.advance(Duration.ofMillis(100));
+		host.click(RandomTargetParDrill.RESUME);
+
+		// Round 2 starts 5 s after the resume, then 1 s: at 17.6 s
+		host.advance(Duration.ofSeconds(6));
+		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
+				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV), host.sounds());
+		assertEquals(Optional.of("Round: 2/2"), roundText());
+
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		assertEquals("10 points   -  0.500 seconds", timeText());
+
+		// Past round 1's old par end (26 s): round 2 is still the one running
+		host.advance(Duration.ofSeconds(9));
+		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
+				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV), host.sounds());
+		assertTrue(host.isVisible(target()));
+		assertFalse(host.isShotDetectionPaused());
+		assertEquals(Optional.of("Round: 2/2"), roundText());
+
+		// Round 2's own par time ends at 32.6 s, with its shot scored; then the summary, and nothing more
+		host.advance(Duration.ofSeconds(30));
+		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV,
+				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV),
+				host.sounds());
+		assertEquals(1, host.rows().size());
+		assertEquals("0.50", host.rows().get(0).values().get(RandomTargetParDrill.LENGTH_COL_NAME));
+		assertEquals("10", host.rows().get(0).values().get(RandomTargetParDrill.POINTS_COL_NAME));
+		assertEquals("Hit Factor: 20.00   (2 rounds, 15.00 s par)\nNew personal best!\n\n"
+				+ "Total Shots: 1\nTotal Points: 10\nTotal Time: 0.50\nAverage Points: 10.000\n"
+				+ "Average Time: 0.500\nPoints min/max: 10.00/10.00\nTimes min/max: 0.500/0.500\n"
+				+ "Missed Shots: 0\nMissed Par: 0", scoreText());
 	}
 
 	@Test

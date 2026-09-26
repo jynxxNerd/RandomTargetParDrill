@@ -77,6 +77,8 @@ public class RandomTargetParDrill implements Exercise {
 	// Every scheduled task, all cancelled by a reset; the pending round step, replaced by a resume
 	private final List<Cancellable> pending = new ArrayList<>();
 	private Optional<Cancellable> nextStep = Optional.empty();
+	// The running round's end, at the end of its par time: present only while a round runs
+	private Optional<Cancellable> roundEnd = Optional.empty();
 	private final List<ShotMarkerHandle> roundMarkers = new ArrayList<>();
 	private final List<ShotMarkerHandle> replayMarkers = new ArrayList<>();
 	private final List<TrackedShot> trackedShots = new ArrayList<>();
@@ -90,8 +92,6 @@ public class RandomTargetParDrill implements Exercise {
 	private boolean countScore = false;
 	private boolean shootToReset = false;
 	private boolean hadShot = false;
-	// Paused during the current round's par time: its end leaves the next round to the resume
-	private boolean pausedDuringRound = false;
 	private boolean isDrillComplete = false;
 	private long beepTime = 0;
 	private long roundStartTime = 0;
@@ -241,6 +241,8 @@ public class RandomTargetParDrill implements Exercise {
 		pending.clear();
 		nextStep.ifPresent(Cancellable::cancel);
 		nextStep = Optional.empty();
+		roundEnd.ifPresent(Cancellable::cancel);
+		roundEnd = Optional.empty();
 	}
 
 	private void pauseOrResume() {
@@ -253,10 +255,10 @@ public class RandomTargetParDrill implements Exercise {
 			paused = true;
 			pauseResumeButton.setLabel(RESUME);
 			repeatExercise = false;
-			if (countScore) pausedDuringRound = true;
 			host.pauseShotDetection(true);
 			nextStep.ifPresent(Cancellable::cancel);
 			nextStep = Optional.empty();
+			if (roundEnd.isPresent()) abandonRound();
 		} else {
 			paused = false;
 			pauseResumeButton.setLabel(PAUSE);
@@ -277,7 +279,6 @@ public class RandomTargetParDrill implements Exercise {
 		if (!repeatExercise) return;
 
 		countScore = true;
-		pausedDuringRound = false;
 		round++;
 		host.playSound(BEEP_WAV);
 
@@ -289,10 +290,22 @@ public class RandomTargetParDrill implements Exercise {
 
 		host.pauseShotDetection(false);
 		startRoundTimer();
-		schedule(this::endRound, Duration.ofMillis(Math.round(parTime * 1000)));
+		roundEnd = Optional.of(host.schedule(this::endRound, Duration.ofMillis(Math.round(parTime * 1000))));
+	}
+
+	// A pause during the par time ends the round there: its end is cancelled, so it can never act on a
+	// later round, and nothing of it is scored beyond the shots already fired (no par miss, no
+	// buzzer). The resume starts the next round, 5 s after it with "make ready".
+	private void abandonRound() {
+		roundEnd.ifPresent(Cancellable::cancel);
+		roundEnd = Optional.empty();
+		countScore = false;
+		hadShot = false;
+		hideTargetAndShots();
 	}
 
 	private void endRound() {
+		roundEnd = Optional.empty();
 		if (!hadShot) {
 			logger.info("Round ended without a shot");
 			parMissed();
@@ -305,8 +318,7 @@ public class RandomTargetParDrill implements Exercise {
 		checkDrillComplete();
 
 		final int nextDelay = setupRound();
-		// After a pause in this round, the resume starts the next one (5 s, then "make ready")
-		if (!pausedDuringRound) scheduleNextStep(this::startRound, Duration.ofSeconds(nextDelay));
+		scheduleNextStep(this::startRound, Duration.ofSeconds(nextDelay));
 
 		if (isDrillComplete) schedule(this::displayResults, RESULTS_DELAY);
 	}
@@ -498,7 +510,6 @@ public class RandomTargetParDrill implements Exercise {
 		// A reset during a round (after a shot, or a pause) mustn't carry over into the next one
 		hadShot = false;
 		countScore = false;
-		pausedDuringRound = false;
 		repeatExercise = true;
 		roundStartTime = 0;
 		score = 0;
