@@ -405,6 +405,9 @@ public class RandomTargetParDrill implements Exercise {
 	}
 
 	private void displayResults() {
+		// The summary's own text (the hit factor and personal best) sits where this would overlap it
+		roundText.setText("");
+
 		final Size surface = host.surfaceSize();
 		final Size size = target.size();
 		final double targetX = (surface.getWidth() / 2) - (size.getWidth() / 2) - MARGIN;

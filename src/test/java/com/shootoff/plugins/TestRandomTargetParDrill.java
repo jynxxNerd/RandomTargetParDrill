@@ -387,6 +387,37 @@ class TestRandomTargetParDrill {
 	}
 
 	@Test
+	void roundLabelIsHiddenOnceTheSummaryShows() {
+		startDrill(1);
+
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		// The round's par time ends 1.5 s later, then the summary shows 1 s after that
+		host.advance(Duration.ofMillis(2500));
+
+		assertEquals(Optional.of(""), roundText());
+	}
+
+	@Test
+	void roundLabelReturnsWhenTheDrillResetsAfterTheSummary() {
+		startDrill(1);
+
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		host.advance(Duration.ofMillis(2500));
+		assertEquals(Optional.of(""), roundText());
+
+		// Shoot-to-reset activates 4 s after the round ends; the next shot resets the drill
+		host.advance(Duration.ofSeconds(4));
+		shootCenter();
+		assertEquals(Optional.of("Round: 0/1"), roundText());
+
+		// 5 s after the reset: "make ready", then the round 1 s later
+		host.advance(Duration.ofSeconds(6));
+		assertEquals(Optional.of("Round: 1/1"), roundText());
+	}
+
+	@Test
 	void theFirstV2RunCountsTheV1PersonalBest() throws IOException {
 		final Path legacy = temp.resolve("home").resolve(RandomTargetParDrill.BESTS_FILE);
 		Files.writeString(legacy, "1rounds-2.00spar=40.0\n");
