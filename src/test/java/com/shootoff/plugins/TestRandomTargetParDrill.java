@@ -25,6 +25,7 @@ import com.shootoff.exercise.RowStyle;
 import com.shootoff.exercise.ShotStyle;
 import com.shootoff.exercise.TargetHandle;
 import com.shootoff.geom.Point;
+import com.shootoff.geom.Size;
 
 class TestRandomTargetParDrill {
 	@TempDir Path temp;
@@ -111,7 +112,7 @@ class TestRandomTargetParDrill {
 		}
 		assertTrue(host.messages().contains("Score: 100"));
 
-		final String summary = "Hit Factor: 20.00   (10 rounds, 2.00 s par)\nNew personal best!\n\n"
+		final String summary = "Hit Factor: 20.00   (Easy, 10 rounds, 2.00 s par)\nNew personal best!\n\n"
 				+ "Total Shots: 10\nTotal Points: 100\nTotal Time: 5.00\nAverage Points: 10.000\n"
 				+ "Average Time: 0.500\nPoints min/max: 10.00/10.00\nTimes min/max: 0.500/0.500\n"
 				+ "Missed Shots: 0\nMissed Par: 0";
@@ -146,7 +147,7 @@ class TestRandomTargetParDrill {
 		assertEquals("0", row.values().get(RandomTargetParDrill.POINTS_COL_NAME));
 
 		host.advance(Duration.ofSeconds(1));
-		assertEquals("Hit Factor: 0.00   (1 rounds, 2.00 s par)\nNew personal best!\n\n"
+		assertEquals("Hit Factor: 0.00   (Easy, 1 rounds, 2.00 s par)\nNew personal best!\n\n"
 				+ "Total Shots: 1\nTotal Points: 0\nTotal Time: 2.00\nAverage Points: 0.000\n"
 				+ "Average Time: 2.000\nPoints min/max: 0.00/0.00\nTimes min/max: 2.000/2.000\n"
 				+ "Missed Shots: 0\nMissed Par: 1", scoreText());
@@ -164,7 +165,7 @@ class TestRandomTargetParDrill {
 		assertEquals("Missed!", timeText());
 
 		host.advance(Duration.ofMillis(2500));
-		assertEquals("Hit Factor: 0.00   (1 rounds, 2.00 s par)\nNew personal best!\n\n"
+		assertEquals("Hit Factor: 0.00   (Easy, 1 rounds, 2.00 s par)\nNew personal best!\n\n"
 				+ "Total Shots: 1\nTotal Points: 0\nTotal Time: 0.50\nAverage Points: 0.000\n"
 				+ "Average Time: 0.500\nPoints min/max: 0.00/0.00\nTimes min/max: 0.500/0.500\n"
 				+ "Missed Shots: 1\nMissed Par: 0", scoreText());
@@ -181,13 +182,13 @@ class TestRandomTargetParDrill {
 
 		host.advance(Duration.ofMillis(500));
 		host.click(RandomTargetParDrill.PAUSE);
-		assertEquals(List.of(RandomTargetParDrill.RESUME, RandomTargetParDrill.CLEAR_SHOTS), host.buttonLabels());
+		assertEquals(List.of(RandomTargetParDrill.RESUME, RandomTargetParDrill.CLEAR_SHOTS, "Difficulty: Easy"), host.buttonLabels());
 		assertTrue(host.isShotDetectionPaused());
 
 		// Resuming before the paused round would have started must not start two rounds
 		host.advance(Duration.ofMillis(100));
 		host.click(RandomTargetParDrill.RESUME);
-		assertEquals(List.of(RandomTargetParDrill.PAUSE, RandomTargetParDrill.CLEAR_SHOTS), host.buttonLabels());
+		assertEquals(List.of(RandomTargetParDrill.PAUSE, RandomTargetParDrill.CLEAR_SHOTS, "Difficulty: Easy"), host.buttonLabels());
 		host.advance(Duration.ofMillis(4900));
 		assertEquals(List.of(RandomTargetParDrill.MAKE_READY_WAV), host.sounds());
 		assertFalse(host.isVisible(target()));
@@ -261,7 +262,7 @@ class TestRandomTargetParDrill {
 				RandomTargetParDrill.MAKE_READY_WAV, RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV,
 				RandomTargetParDrill.BEEP_WAV, RandomTargetParDrill.BUZZER_WAV), host.sounds());
 		assertEquals(2, host.rows().size());
-		assertTrue(scoreText().startsWith("Hit Factor: 0.00   (2 rounds, 2.00 s par)\n"), scoreText());
+		assertTrue(scoreText().startsWith("Hit Factor: 0.00   (Easy, 2 rounds, 2.00 s par)\n"), scoreText());
 		assertTrue(scoreText().endsWith("\nMissed Par: 2"), scoreText());
 	}
 
@@ -313,7 +314,7 @@ class TestRandomTargetParDrill {
 			assertEquals("0.50", row.values().get(RandomTargetParDrill.LENGTH_COL_NAME));
 			assertEquals("10", row.values().get(RandomTargetParDrill.POINTS_COL_NAME));
 		}
-		assertEquals("Hit Factor: 20.00   (2 rounds, 15.00 s par)\nNew personal best!\n\n"
+		assertEquals("Hit Factor: 20.00   (Easy, 2 rounds, 15.00 s par)\nNew personal best!\n\n"
 				+ "Total Shots: 2\nTotal Points: 20\nTotal Time: 1.00\nAverage Points: 10.000\n"
 				+ "Average Time: 0.500\nPoints min/max: 10.00/10.00\nTimes min/max: 0.500/0.500\n"
 				+ "Missed Shots: 0\nMissed Par: 0", scoreText());
@@ -359,7 +360,7 @@ class TestRandomTargetParDrill {
 		assertEquals(4, count(host.sounds(), RandomTargetParDrill.BEEP_WAV));
 		assertEquals(3, count(host.sounds(), RandomTargetParDrill.BUZZER_WAV));
 		assertFalse(host.messages().contains("Score: 40"));
-		assertEquals("Hit Factor: 20.00   (3 rounds, 2.00 s par)\nNew personal best!\n\n"
+		assertEquals("Hit Factor: 20.00   (Easy, 3 rounds, 2.00 s par)\nNew personal best!\n\n"
 				+ "Total Shots: 3\nTotal Points: 30\nTotal Time: 1.50\nAverage Points: 10.000\n"
 				+ "Average Time: 0.500\nPoints min/max: 10.00/10.00\nTimes min/max: 0.500/0.500\n"
 				+ "Missed Shots: 0\nMissed Par: 0", scoreText());
@@ -380,7 +381,7 @@ class TestRandomTargetParDrill {
 		shootCenter();
 		host.advance(Duration.ofMillis(2500));
 
-		assertTrue(scoreText().startsWith("Hit Factor: 20.00   (1 rounds, 2.00 s par)\n"
+		assertTrue(scoreText().startsWith("Hit Factor: 20.00   (Easy, 1 rounds, 2.00 s par)\n"
 				+ "50% of personal best (40.00)\n\nTotal Shots: 1\nTotal Points: 10\n"), scoreText());
 		// A worse run keeps the best
 		assertEquals(Optional.of(40.0), new PersonalBests(bests).best("1rounds-2.00spar"));
@@ -427,9 +428,92 @@ class TestRandomTargetParDrill {
 		shootCenter();
 		host.advance(Duration.ofMillis(2500));
 
-		assertTrue(scoreText().startsWith("Hit Factor: 20.00   (1 rounds, 2.00 s par)\n"
+		assertTrue(scoreText().startsWith("Hit Factor: 20.00   (Easy, 1 rounds, 2.00 s par)\n"
 				+ "50% of personal best (40.00)\n"), scoreText());
 		// The v1 drill's file is untouched
 		assertEquals("1rounds-2.00spar=40.0\n", Files.readString(legacy));
+	}
+
+	@Test
+	void drillStartsOnEasyWithTheFullTarget() {
+		startDrill(1);
+
+		assertTrue(host.buttonLabels().contains("Difficulty: Easy"), host.buttonLabels().toString());
+		assertEquals(new Size(400, 400), target().size());
+	}
+
+	@Test
+	void difficultyButtonStepsThroughTheLevelsWithSmallerTargets() {
+		startDrill(1);
+
+		host.click("Difficulty: Easy");
+		assertTrue(host.buttonLabels().contains("Difficulty: Medium"), host.buttonLabels().toString());
+		assertEquals(1, host.targets().size());
+		assertEquals(new Size(200, 200), target().size());
+
+		host.click("Difficulty: Medium");
+		assertTrue(host.buttonLabels().contains("Difficulty: Hard"), host.buttonLabels().toString());
+		assertEquals(1, host.targets().size());
+		assertEquals(new Size(120, 120), target().size());
+
+		host.click("Difficulty: Hard");
+		assertTrue(host.buttonLabels().contains("Difficulty: Easy"), host.buttonLabels().toString());
+		assertEquals(new Size(400, 400), target().size());
+	}
+
+	@Test
+	void changingDifficultyRestartsTheDrill() {
+		startDrill(2);
+		host.advance(Duration.ofMillis(500));
+		shootCenter();
+		assertEquals(Optional.of("Round: 1/2"), roundText());
+
+		host.click("Difficulty: Easy");
+
+		assertEquals(Optional.of("Round: 0/2"), roundText());
+		assertEquals("Score: 0", scoreText());
+		assertFalse(host.isVisible(target()));
+		assertTrue(host.isShotDetectionPaused());
+
+		// 5 s after the change: "make ready", then round 1 on the smaller target 1 s later
+		host.advance(Duration.ofSeconds(6));
+		assertEquals(Optional.of("Round: 1/2"), roundText());
+		assertTrue(host.isVisible(target()));
+		assertEquals(new Size(200, 200), target().size());
+	}
+
+	@Test
+	void theNextRunStartsOnTheLastChosenDifficulty() {
+		startDrill(1);
+		host.click("Difficulty: Easy");
+		host.click("Difficulty: Medium");
+		host.stop();
+
+		host = new FakeExerciseHost(FakeExerciseHost.DEFAULT_SURFACE, true, temp.resolve("data"));
+		startDrill(1);
+
+		assertTrue(host.buttonLabels().contains("Difficulty: Hard"), host.buttonLabels().toString());
+		assertEquals(new Size(120, 120), target().size());
+	}
+
+	@Test
+	void eachDifficultyKeepsItsOwnPersonalBest() throws IOException {
+		final Path bests = temp.resolve("data").resolve(RandomTargetParDrill.BESTS_FILE);
+		Files.writeString(bests, "1rounds-2.00spar=40.0\n");
+
+		startDrill(1);
+		host.click("Difficulty: Easy");
+		// 5 s after the change: "make ready", then the round 1 s later; the medium target's center is
+		// 100, 100 into it
+		host.advance(Duration.ofSeconds(6));
+		host.advance(Duration.ofMillis(500));
+		final Point position = target().position();
+		assertTrue(host.shoot(ShotColor.RED, position.getX() + 100, position.getY() + 100));
+		host.advance(Duration.ofMillis(2500));
+
+		assertTrue(scoreText().startsWith("Hit Factor: 20.00   (Medium, 1 rounds, 2.00 s par)\n"
+				+ "New personal best!\n"), scoreText());
+		assertEquals(Optional.of(20.0), new PersonalBests(bests).best("medium-1rounds-2.00spar"));
+		assertEquals(Optional.of(40.0), new PersonalBests(bests).best("1rounds-2.00spar"));
 	}
 }

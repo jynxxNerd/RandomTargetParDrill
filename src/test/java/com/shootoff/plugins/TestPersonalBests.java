@@ -16,7 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 class TestPersonalBests {
 	@TempDir Path tempDir;
 
-	private static final String KEY = PersonalBests.settingsKey(10, 4.0);
+	private static final String KEY = PersonalBests.settingsKey(Difficulty.EASY, 10, 4.0);
 
 	private PersonalBests newBests() {
 		return new PersonalBests(tempDir.resolve("bests.properties"));
@@ -25,6 +25,12 @@ class TestPersonalBests {
 	@Test
 	void settingsKeyNamesRoundsAndPar() {
 		assertEquals("10rounds-4.00spar", KEY);
+	}
+
+	@Test
+	void harderLevelsPrefixTheKeyWithTheirName() {
+		assertEquals("medium-10rounds-4.00spar", PersonalBests.settingsKey(Difficulty.MEDIUM, 10, 4.0));
+		assertEquals("hard-10rounds-4.00spar", PersonalBests.settingsKey(Difficulty.HARD, 10, 4.0));
 	}
 
 	@Test
@@ -55,7 +61,7 @@ class TestPersonalBests {
 	@Test
 	void differentSettingsKeepSeparateBests() throws IOException {
 		final PersonalBests bests = newBests();
-		final String otherKey = PersonalBests.settingsKey(5, 2.5);
+		final String otherKey = PersonalBests.settingsKey(Difficulty.EASY, 5, 2.5);
 
 		bests.recordIfBest(KEY, 5.19);
 

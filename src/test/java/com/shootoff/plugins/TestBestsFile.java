@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class TestBestsFile {
-	private static final String KEY = PersonalBests.settingsKey(10, 4.0);
+	private static final String KEY = PersonalBests.settingsKey(Difficulty.EASY, 10, 4.0);
 
 	@TempDir Path temp;
 	private Path data;

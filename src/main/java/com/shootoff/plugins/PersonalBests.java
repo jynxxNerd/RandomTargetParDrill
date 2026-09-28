@@ -22,8 +22,15 @@ public final class PersonalBests {
 		this.file = file;
 	}
 
-	public static String settingsKey(int rounds, double parTime) {
-		return String.format(Locale.ROOT, "%drounds-%.2fspar", rounds, parTime);
+	/**
+	 * Easy keeps the key from before difficulties existed, so its bests are the earlier runs'
+	 */
+	public static String settingsKey(Difficulty difficulty, int rounds, double parTime) {
+		final String key = String.format(Locale.ROOT, "%drounds-%.2fspar", rounds, parTime);
+
+		if (difficulty == Difficulty.EASY) return key;
+
+		return difficulty.name().toLowerCase(Locale.ROOT) + "-" + key;
 	}
 
 	public Optional<Double> best(String settingsKey) throws IOException {

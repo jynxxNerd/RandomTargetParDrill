@@ -1,6 +1,8 @@
 package com.shootoff.plugins;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -30,14 +32,15 @@ import com.shootoff.targets.model.Hit;
 
 /**
  * Shows the ISSF target at a random place on the projector arena after a random delay: shoot it
- * before the par time runs out. After the last round it shows the hit factor against the personal
- * best for the same settings, and replays every shot on the target.
+ * before the par time runs out. The difficulty sets how many of the target's rings show. After the
+ * last round it shows the hit factor against the personal best for the same settings, and replays
+ * every shot on the target.
  */
 public class RandomTargetParDrill implements Exercise {
 	private static final Logger logger = LoggerFactory.getLogger(RandomTargetParDrill.class);
 
 	static final String BESTS_FILE = "RandomTargetParDrill-bests.properties";
-	static final String TARGET_FILE = "@targets/ISSF.target";
+	static final String SETTINGS_FILE = "RandomTargetParDrill-settings.properties";
 	static final String BACKGROUND = "/backgrounds/blackBG.png";
 	static final String BUZZER_WAV = "/sounds/buzzer.wav";
 	static final String MAKE_READY_WAV = "sounds/voice/shootoff-makeready.wav";
@@ -45,6 +48,7 @@ public class RandomTargetParDrill implements Exercise {
 	static final String PAUSE = "Pause";
 	static final String RESUME = "Resume";
 	static final String CLEAR_SHOTS = "Clear Shots";
+	static final String DIFFICULTY = "Difficulty: ";
 	static final String ROUNDS_SETTING = "Shots per round";
 	static final String LENGTH_COL_NAME = "Length";
 	static final String POINTS_COL_NAME = "Score";
@@ -71,6 +75,7 @@ public class RandomTargetParDrill implements Exercise {
 	private PersonalBests personalBests;
 	private TargetHandle target;
 	private ButtonHandle pauseResumeButton;
+	private ButtonHandle difficultyButton;
 	private TextHandle scoreText;
 	private TextHandle roundText;
 	private TextHandle timeText;
@@ -84,6 +89,8 @@ public class RandomTargetParDrill implements Exercise {
 	private final List<ShotMarkerHandle> replayMarkers = new ArrayList<>();
 	private final List<TrackedShot> trackedShots = new ArrayList<>();
 
+	private Path settingsFile;
+	private Difficulty difficulty = Difficulty.EASY;
 	private double parTime = DEFAULT_PAR_TIME;
 	private int delayMin = DEFAULT_DELAY.minSeconds();
 	private int delayMax = DEFAULT_DELAY.maxSeconds();
@@ -129,9 +136,9 @@ public class RandomTargetParDrill implements Exercise {
 		personalBests = new PersonalBests(BestsFile.locate(host.dataDirectory(),
 				Paths.get(System.getProperty("shootoff.home", System.getProperty("user.dir")))));
 
-		target = host.addTarget(TARGET_FILE, 0, 0)
-				.orElseThrow(() -> new IllegalStateException("Can't load " + TARGET_FILE));
-		target.setVisible(false);
+		settingsFile = host.dataDirectory().resolve(SETTINGS_FILE);
+		difficulty = SavedDifficulty.load(settingsFile);
+		target = addTarget(difficulty);
 
 		initUI();
 		initService();
@@ -201,6 +208,7 @@ public class RandomTargetParDrill implements Exercise {
 		host.setBackground(BACKGROUND);
 		pauseResumeButton = host.addButton(PAUSE, this::pauseOrResume);
 		host.addButton(CLEAR_SHOTS, host::clearShots);
+		difficultyButton = host.addButton(difficultyLabel(), this::changeDifficulty);
 		host.addColumn(LENGTH_COL_NAME);
 		host.addColumn(POINTS_COL_NAME);
 
@@ -217,6 +225,39 @@ public class RandomTargetParDrill implements Exercise {
 			delayMin = range.minSeconds();
 			delayMax = range.maxSeconds();
 		});
+	}
+
+	// The target for a difficulty, hidden until a round shows it
+	private TargetHandle addTarget(Difficulty level) {
+		final Path file;
+		try {
+			file = IssfTarget.write(host.dataDirectory(), level.rings());
+		} catch (final IOException e) {
+			throw new UncheckedIOException("Can't write the target for " + level, e);
+		}
+
+		final TargetHandle added = host.addTarget(file.toString(), 0, 0)
+				.orElseThrow(() -> new IllegalStateException("Can't load " + file));
+		added.setVisible(false);
+		return added;
+	}
+
+	// Moves to the next difficulty, remembered for the next run, and restarts the drill on its target
+	private void changeDifficulty() {
+		final Difficulty next = difficulty.next();
+		final TargetHandle nextTarget = addTarget(next);
+		target.remove();
+		target = nextTarget;
+		difficulty = next;
+
+		SavedDifficulty.save(settingsFile, difficulty);
+		difficultyButton.setLabel(difficultyLabel());
+		host.clearShots();
+		onReset();
+	}
+
+	private String difficultyLabel() {
+		return DIFFICULTY + difficulty.label();
 	}
 
 	private void initService() {
@@ -463,15 +504,15 @@ public class RandomTargetParDrill implements Exercise {
 	}
 
 	private String hitFactorSummary(double hitFactor) {
-		final String settingsKey = PersonalBests.settingsKey(roundLimit, parTime);
+		final String settingsKey = PersonalBests.settingsKey(difficulty, roundLimit, parTime);
 
 		try {
 			final Optional<Double> previousBest = personalBests.best(settingsKey);
 			personalBests.recordIfBest(settingsKey, hitFactor);
-			return HitFactorSummary.format(hitFactor, roundLimit, parTime, previousBest);
+			return HitFactorSummary.format(hitFactor, difficulty, roundLimit, parTime, previousBest);
 		} catch (final IOException e) {
 			logger.error("Could not read or save personal best hit factors", e);
-			return HitFactorSummary.format(hitFactor, roundLimit, parTime);
+			return HitFactorSummary.format(hitFactor, difficulty, roundLimit, parTime);
 		}
 	}
 

@@ -9,8 +9,9 @@ import java.util.Optional;
 public final class HitFactorSummary {
 	private HitFactorSummary() {}
 
-	public static String format(double hitFactor, int rounds, double parTime) {
-		return String.format(Locale.ROOT, "Hit Factor: %.2f   (%d rounds, %.2f s par)", hitFactor, rounds, parTime);
+	public static String format(double hitFactor, Difficulty difficulty, int rounds, double parTime) {
+		return String.format(Locale.ROOT, "Hit Factor: %.2f   (%s, %d rounds, %.2f s par)", hitFactor,
+				difficulty.label(), rounds, parTime);
 	}
 
 	/**
@@ -18,8 +19,9 @@ public final class HitFactorSummary {
 	 *            the best hit factor for these settings before this run, if
 	 *            any
 	 */
-	public static String format(double hitFactor, int rounds, double parTime, Optional<Double> previousBest) {
-		final String hitFactorLine = format(hitFactor, rounds, parTime);
+	public static String format(double hitFactor, Difficulty difficulty, int rounds, double parTime,
+			Optional<Double> previousBest) {
+		final String hitFactorLine = format(hitFactor, difficulty, rounds, parTime);
 
 		if (!previousBest.isPresent() || hitFactor > previousBest.get()) {
 			return hitFactorLine + "\nNew personal best!";
